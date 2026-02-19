@@ -34,7 +34,10 @@ interface EditorState {
   projectSettings: ProjectSettings & { defaults: ProjectSettings['defaults'] & { ollamaModel: string } };
   systemStatus: SystemStatus;
   
-  // Missing state properties for preview and AI features
+  // Drag and Drop state
+  draggingAsset: TimelineClip | null;
+  
+  // AI features
   maskData: string | null;
   proxyMode: boolean;
   customWorkflows: CustomWorkflow[];
@@ -49,6 +52,7 @@ interface EditorState {
   setSelectedKeyframes: (kfs: SelectedKeyframe[]) => void;
   setIsPlaying: (playing: boolean) => void;
   setSystemStatus: (status: Partial<SystemStatus>) => void;
+  setDraggingAsset: (asset: TimelineClip | null) => void;
   addAsset: (asset: TimelineClip) => void;
   updateAsset: (id: string, updates: Partial<TimelineClip>) => void;
   addClipToTrack: (trackId: string, asset: TimelineClip, startTime: number) => void;
@@ -56,7 +60,6 @@ interface EditorState {
   saveProject: (isAutoSave?: boolean) => Promise<void>;
   updateKeyframe: (trackId: string, clipId: string, property: string, index: number, updates: Partial<Keyframe>) => void;
   
-  // Missing Actions for keyframing and workspace management
   toggleKeyframe: (trackId: string, clipId: string, property: string) => void;
   setKeyframeAtTime: (trackId: string, clipId: string, property: string, value: number) => void;
   setMaskData: (mask: string | null) => void;
@@ -102,7 +105,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeView: 'studio',
   tracks: INITIAL_TRACKS,
   currentTime: 0,
-  duration: 300, // 5 minutes default
+  duration: 300,
   zoomLevel: 100,
   selectedClipId: null,
   selectedKeyframes: [],
@@ -118,6 +121,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     nodes: []
   },
   
+  draggingAsset: null,
   maskData: null,
   proxyMode: false,
   customWorkflows: [],
@@ -131,6 +135,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSelectedKeyframes: (kfs) => set({ selectedKeyframes: kfs }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   setSystemStatus: (status) => set(state => ({ systemStatus: { ...state.systemStatus, ...status } })),
+  setDraggingAsset: (asset) => set({ draggingAsset: asset }),
   
   addAsset: (asset) => set(state => ({ assets: [...state.assets, asset] })),
   updateAsset: (id, updates) => set(state => ({ 

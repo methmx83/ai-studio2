@@ -2,13 +2,19 @@
 import React, { useState } from 'react';
 import { useEditorStore } from '../store';
 import { AssetTag, MediaType } from '../types';
-import { Search, Film, Type as TypeIcon, Plus, Edit2, Check, X } from 'lucide-react';
+import { Search, Film, Type as TypeIcon, Plus, Edit2, Check, X, Clock } from 'lucide-react';
 
 const AssetLibrary: React.FC = () => {
-  const { assets, addAsset, updateAsset } = useEditorStore();
+  const { assets, addAsset, updateAsset, setDraggingAsset } = useEditorStore();
   const [filter, setFilter] = useState<AssetTag | 'All'>('All');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempName, setTempName] = useState("");
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -29,7 +35,6 @@ const AssetLibrary: React.FC = () => {
           keyframes: {}
         };
         addAsset(newAsset);
-        // Automatically enter rename mode for the new asset to encourage clean naming
         setEditingId(id);
         setTempName(file.name);
       });
@@ -70,11 +75,6 @@ const AssetLibrary: React.FC = () => {
     if (tempName.trim()) {
       updateAsset(id, { name: tempName.trim() });
     }
-    setEditingId(null);
-  };
-
-  const cancelRename = (e: React.MouseEvent) => {
-    e.stopPropagation();
     setEditingId(null);
   };
 
@@ -129,7 +129,9 @@ const AssetLibrary: React.FC = () => {
                 return;
               }
               e.dataTransfer.setData('asset', JSON.stringify(asset));
+              setDraggingAsset(asset);
             }}
+            onDragEnd={() => setDraggingAsset(null)}
             className="group relative rounded-xl overflow-hidden bg-zinc-950 border border-zinc-800 aspect-video cursor-grab active:cursor-grabbing hover:border-blue-500 transition-all shadow-lg"
           >
             {asset.type === MediaType.TEXT ? (
@@ -141,42 +143,51 @@ const AssetLibrary: React.FC = () => {
             )}
             
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-2 opacity-90 group-hover:opacity-100">
-              <div className="flex items-center justify-between gap-1 text-[9px] text-zinc-300 font-bold uppercase tracking-widest">
-                <div className="flex items-center gap-1.5 truncate flex-1">
-                  {asset.type === MediaType.TEXT ? <TypeIcon size={10} className="text-blue-400" /> : <Film size={10} />}
-                  
-                  {editingId === asset.id ? (
-                    <div className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
-                      <input 
-                        autoFocus
-                        className="bg-zinc-900 border border-blue-500 rounded px-1 outline-none text-white w-full text-[9px] font-mono"
-                        value={tempName}
-                        onChange={(e) => setTempName(e.target.value)}
-                        onBlur={() => saveRename(asset.id)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') saveRename(asset.id);
-                          if (e.key === 'Escape') setEditingId(null);
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <span 
-                      className="truncate cursor-text hover:text-white transition-colors"
+              <div className="space-y-0.5">
+                <div className="flex items-center justify-between gap-1 text-[9px] text-zinc-300 font-bold uppercase tracking-widest">
+                  <div className="flex items-center gap-1.5 truncate flex-1">
+                    {asset.type === MediaType.TEXT ? <TypeIcon size={10} className="text-blue-400" /> : <Film size={10} />}
+                    
+                    {editingId === asset.id ? (
+                      <div className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
+                        <input 
+                          autoFocus
+                          className="bg-zinc-900 border border-blue-500 rounded px-1 outline-none text-white w-full text-[9px] font-mono"
+                          value={tempName}
+                          onChange={(e) => setTempName(e.target.value)}
+                          onBlur={() => saveRename(asset.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveRename(asset.id);
+                            if (e.key === 'Escape') setEditingId(null);
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <span 
+                        className="truncate cursor-text hover:text-white transition-colors"
+                        onClick={(e) => startRename(e, asset.id, asset.name)}
+                      >
+                        {asset.name}
+                      </span>
+                    )}
+                  </div>
+
+                  {!editingId && (
+                    <button 
                       onClick={(e) => startRename(e, asset.id, asset.name)}
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:text-blue-400 transition-all"
                     >
-                      {asset.name}
-                    </span>
+                      <Edit2 size={10} />
+                    </button>
                   )}
                 </div>
 
-                {!editingId && (
-                  <button 
-                    onClick={(e) => startRename(e, asset.id, asset.name)}
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:text-blue-400 transition-all"
-                    title="Rename Asset"
-                  >
-                    <Edit2 size={10} />
-                  </button>
+                {/* Duration Display */}
+                {(asset.type === MediaType.VIDEO || asset.type === MediaType.AUDIO) && (
+                  <div className="flex items-center gap-1 text-[7px] text-zinc-500 font-bold tracking-widest">
+                    <Clock size={8} />
+                    {formatDuration(asset.duration)}
+                  </div>
                 )}
               </div>
             </div>
