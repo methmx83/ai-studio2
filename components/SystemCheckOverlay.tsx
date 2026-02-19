@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { useEditorStore } from '../store';
 import { Cpu, Activity, ShieldCheck, AlertCircle, RefreshCw, Layers, CheckCircle2, Server, Terminal, ArrowRight, ZapOff } from 'lucide-react';
-import { fetchInstalledModels } from '../ollamaService';
 
 const REQUIRED_NODES = ['SVD_img2vid', 'ControlNetApply', 'UltimateSDUpscale', 'RMBG'];
 const COMFY_URL = 'http://127.0.0.1:8188';
@@ -22,11 +21,13 @@ const SystemCheckOverlay: React.FC = () => {
     // 1. Check ComfyUI
     try {
       addLog(`Prüfe ComfyUI auf ${COMFY_URL}...`);
+      // Wir versuchen einen einfachen Fetch. Wenn CORS blockiert, wirft fetch einen TypeError.
       const comfyResp = await fetch(`${COMFY_URL}/system_stats`, { cache: 'no-store' });
       if (comfyResp.ok) {
         setSystemStatus({ comfy: 'online' });
         addLog("ComfyUI Core: ONLINE.");
         
+        // Custom Nodes Check
         const infoResp = await fetch(`${COMFY_URL}/object_info`);
         const info = await infoResp.json();
         const nodesStatus = REQUIRED_NODES.map(node => ({
@@ -43,23 +44,18 @@ const SystemCheckOverlay: React.FC = () => {
       addLog("Tipp: Starte ComfyUI mit --enable-cors-header");
     }
 
-    // 2. Check Ollama & Fetch Models
+    // 2. Check Ollama
     try {
       addLog(`Prüfe Ollama auf ${OLLAMA_URL}...`);
       const ollamaResp = await fetch(`${OLLAMA_URL}/api/tags`, { method: 'GET', cache: 'no-store' });
       if (ollamaResp.ok) {
+        setSystemStatus({ ollama: 'online' });
         addLog("Ollama Engine: ONLINE.");
-        const models = await fetchInstalledModels();
-        setSystemStatus({ 
-          ollama: 'online', 
-          ollamaModels: models 
-        });
-        addLog(`Gefundene Modelle: ${models.length > 0 ? models.join(', ') : 'Keine'}`);
       } else {
         throw new Error(`HTTP ${ollamaResp.status}`);
       }
     } catch (e: any) {
-      setSystemStatus({ ollama: 'offline', ollamaModels: [] });
+      setSystemStatus({ ollama: 'offline' });
       addLog("Ollama: OFFLINE oder CORS blockiert.");
       addLog("WICHTIG: Setze OLLAMA_ORIGINS=\"*\" in deinen Umgebungsvariablen!");
     }

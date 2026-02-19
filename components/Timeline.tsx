@@ -3,6 +3,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Stage, Layer, Rect, Text, Group, Line, RegularPolygon } from 'react-konva';
 import { useEditorStore } from '../store';
 import { Play, Pause, Scissors, Magnet, ZoomIn, ZoomOut, Clock } from 'lucide-react';
+// Added Keyframe to imports to fix the type inference error below
 import { MediaType, Keyframe } from '../types';
 
 const TRACK_HEIGHT = 80;
@@ -13,19 +14,16 @@ const Timeline: React.FC = () => {
   const { 
     tracks, currentTime, duration, zoomLevel, setZoomLevel, 
     setCurrentTime, isPlaying, setIsPlaying, selectedClipId, setSelectedClipId,
-    updateClip, setSelectedKeyframes, addClipToTrack, draggingAsset, setDraggingAsset
+    updateClip, setSelectedKeyframes
   } = useEditorStore();
   
   const stageRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
-  const [dragPreview, setDragPreview] = useState<{ time: number; trackIndex: number } | null>(null);
-  
   const pxPerSec = (zoomLevel / 100) * 100;
 
   useEffect(() => {
     const updateSize = () => {
-      const el = containerRef.current;
+      const el = document.getElementById('timeline-container');
       if (el) setContainerSize({ width: el.offsetWidth, height: el.offsetHeight });
     };
     updateSize();
@@ -54,72 +52,10 @@ const Timeline: React.FC = () => {
     setSelectedClipId(clipId);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!containerRef.current || !stageRef.current) return;
-
-    const rect = containerRef.current.getBoundingClientRect();
-    const stage = stageRef.current;
-    
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const scrollX = stage.x();
-    
-    const timelineX = mouseX - TRACK_LABEL_WIDTH - scrollX;
-    const dropTime = Math.max(0, timelineX / pxPerSec);
-    const timelineY = mouseY - HEADER_HEIGHT;
-    const trackIndex = Math.floor(timelineY / TRACK_HEIGHT);
-
-    if (trackIndex >= 0 && trackIndex < tracks.length) {
-      setDragPreview({ time: dropTime, trackIndex });
-    } else {
-      setDragPreview(null);
-    }
-    
-    e.dataTransfer.dropEffect = 'copy';
-  };
-
-  const handleDragLeave = () => {
-    setDragPreview(null);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragPreview(null);
-    const assetData = e.dataTransfer.getData('asset');
-    if (!assetData || !containerRef.current || !stageRef.current) return;
-
-    const asset = JSON.parse(assetData);
-    const rect = containerRef.current.getBoundingClientRect();
-    const stage = stageRef.current;
-    
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const scrollX = stage.x();
-    const timelineX = mouseX - TRACK_LABEL_WIDTH - scrollX;
-    const dropTime = Math.max(0, timelineX / pxPerSec);
-    const timelineY = mouseY - HEADER_HEIGHT;
-    const trackIndex = Math.floor(timelineY / TRACK_HEIGHT);
-
-    if (trackIndex >= 0 && trackIndex < tracks.length) {
-      const targetTrack = tracks[trackIndex];
-      addClipToTrack(targetTrack.id, asset, dropTime);
-      setSelectedClipId(asset.id);
-    }
-    setDraggingAsset(null);
-  };
-
   return (
-    <div 
-      ref={containerRef}
-      id="timeline-container" 
-      className="flex flex-col h-[400px] bg-[#0d0d0f] border-t border-[#1a1a1e] relative"
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-    >
+    <div id="timeline-container" className="flex flex-col h-[400px] bg-[#0d0d0f] border-t border-[#1a1a1e]">
       {/* Toolbar */}
-      <div className="h-12 flex items-center justify-between px-6 border-b border-[#1a1a1e] bg-[#09090b]/50 shrink-0">
+      <div className="h-12 flex items-center justify-between px-6 border-b border-[#1a1a1e] bg-[#09090b]/50">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => setIsPlaying(!isPlaying)}
@@ -145,8 +81,8 @@ const Timeline: React.FC = () => {
             <button onClick={() => setZoomLevel(zoomLevel + 10)} className="text-zinc-500 hover:text-white"><ZoomIn size={14} /></button>
           </div>
           <div className="w-px h-4 bg-zinc-800" />
-          <button className="text-zinc-500 hover:text-white" title="Split Clip (Shortcut: S)"><Scissors size={14} /></button>
-          <button className="text-zinc-500 hover:text-white" title="Toggle Snapping"><Magnet size={14} /></button>
+          <button className="text-zinc-500 hover:text-white"><Scissors size={14} /></button>
+          <button className="text-zinc-500 hover:text-white"><Magnet size={14} /></button>
         </div>
       </div>
 
@@ -173,9 +109,9 @@ const Timeline: React.FC = () => {
                   y={0} 
                   width={duration * pxPerSec} 
                   height={TRACK_HEIGHT} 
-                  fill={dragPreview?.trackIndex === i ? "#1e1e24" : (i % 2 === 0 ? "#0d0d0f" : "#0b0b0d")}
-                  stroke={dragPreview?.trackIndex === i ? "#3b82f6" : "#1a1a1e"}
-                  strokeWidth={dragPreview?.trackIndex === i ? 1 : 0.5}
+                  fill={i % 2 === 0 ? "#0d0d0f" : "#0b0b0d"}
+                  stroke="#1a1a1e"
+                  strokeWidth={0.5}
                 />
                 
                 {/* Clips */}
@@ -195,47 +131,52 @@ const Timeline: React.FC = () => {
                       cornerRadius={6}
                       stroke={selectedClipId === clip.id ? "#60a5fa" : "#3f3f46"}
                       strokeWidth={1}
+                      shadowBlur={selectedClipId === clip.id ? 10 : 0}
+                      shadowColor="#3b82f6"
                     />
                     <Text
                       text={clip.name}
-                      x={10} y={15}
+                      x={10}
+                      y={15}
                       fill="white"
                       fontSize={10}
                       fontStyle="bold"
                       fontFamily="Inter"
-                      listening={false}
                     />
+
+                    {/* Keyframes Visual Representation */}
+                    {Object.entries(clip.keyframes).map(([prop, kfs]) => (
+                      <Group key={prop}>
+                        {/* Fix: Explicitly cast kfs to Keyframe[] to resolve 'Property map does not exist on type unknown' error */}
+                        {(kfs as Keyframe[]).map((kf, kfIdx) => (
+                          <RegularPolygon
+                            key={`${prop}-${kfIdx}`}
+                            x={kf.time * pxPerSec}
+                            y={TRACK_HEIGHT - 20}
+                            sides={4}
+                            radius={4}
+                            fill="#60a5fa"
+                            stroke="white"
+                            strokeWidth={0.5}
+                            onClick={(e) => handleKeyframeClick(e, track.id, clip.id, prop, kfIdx)}
+                            onMouseEnter={(e) => {
+                              const container = e.target.getStage().container();
+                              container.style.cursor = 'pointer';
+                              e.target.scale({ x: 1.5, y: 1.5 });
+                            }}
+                            onMouseLeave={(e) => {
+                              const container = e.target.getStage().container();
+                              container.style.cursor = 'default';
+                              e.target.scale({ x: 1, y: 1 });
+                            }}
+                          />
+                        ))}
+                      </Group>
+                    ))}
                   </Group>
                 ))}
               </Group>
             ))}
-
-            {/* Drag Preview (Ghost Clip) */}
-            {dragPreview && draggingAsset && (
-              <Group y={HEADER_HEIGHT + dragPreview.trackIndex * TRACK_HEIGHT}>
-                <Rect 
-                  x={TRACK_LABEL_WIDTH + dragPreview.time * pxPerSec}
-                  y={5}
-                  width={draggingAsset.duration * pxPerSec}
-                  height={TRACK_HEIGHT - 10}
-                  fill="#3b82f6"
-                  opacity={0.4}
-                  cornerRadius={6}
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  dash={[4, 4]}
-                />
-                <Text 
-                   x={TRACK_LABEL_WIDTH + dragPreview.time * pxPerSec + 10}
-                   y={15}
-                   text={draggingAsset.name}
-                   fill="white"
-                   fontSize={10}
-                   opacity={0.6}
-                   fontStyle="italic"
-                />
-              </Group>
-            )}
 
             {/* Track Labels (Fixed) */}
             <Group x={0} y={HEADER_HEIGHT}>
@@ -246,7 +187,7 @@ const Timeline: React.FC = () => {
                   <Text 
                     text={track.name.toUpperCase()} 
                     x={20} y={35} 
-                    fill={dragPreview?.trackIndex === i ? "#3b82f6" : "#52525b"} 
+                    fill="#52525b" 
                     fontSize={9} 
                     fontStyle="900" 
                     fontFamily="Inter"
@@ -257,11 +198,13 @@ const Timeline: React.FC = () => {
             </Group>
 
             {/* Playhead */}
-            <Group x={TRACK_LABEL_WIDTH + currentTime * pxPerSec} y={0} listening={false}>
+            <Group x={TRACK_LABEL_WIDTH + currentTime * pxPerSec} y={0}>
               <Line
                 points={[0, 0, 0, containerSize.height]}
                 stroke="#ef4444"
                 strokeWidth={2}
+                shadowBlur={10}
+                shadowColor="#ef4444"
               />
               <Rect
                 x={-6} y={0}

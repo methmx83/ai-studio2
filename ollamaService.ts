@@ -3,34 +3,17 @@
  * Local AI Service utilizing the Ollama API (Port 11434).
  * Optimized for RTX 5090 environments - 100% Offline & Private.
  */
-import { useEditorStore } from './store';
 
-const OLLAMA_BASE_URL = 'http://127.0.0.1:11434';
-
-const getSelectedModel = () => {
-  return useEditorStore.getState().projectSettings.defaults.ollamaModel || 'llama3:8b';
-};
-
-export const fetchInstalledModels = async (): Promise<string[]> => {
-  try {
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/tags`);
-    if (!response.ok) return [];
-    const data = await response.json();
-    return data.models.map((m: any) => m.name);
-  } catch (error) {
-    console.error("Failed to fetch Ollama models:", error);
-    return [];
-  }
-};
+const OLLAMA_URL = 'http://127.0.0.1:11434/api/generate';
+const MODEL = 'llama3'; // Llama3:8b or Llama3:70b for high-end GPUs
 
 export const enhancePrompt = async (prompt: string): Promise<string> => {
-  const model = getSelectedModel();
   try {
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
+    const response = await fetch(OLLAMA_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: model,
+        model: MODEL,
         prompt: `Act as an expert cinematic prompt engineer. 
         Expand this simple video concept into a high-fidelity cinematic description for AI video generation.
         Include technical details for lighting, lens choice, and camera movement.
@@ -55,13 +38,12 @@ export const enhancePrompt = async (prompt: string): Promise<string> => {
 };
 
 export const analyzeScene = async (description: string): Promise<string> => {
-  const model = getSelectedModel();
   try {
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
+    const response = await fetch(OLLAMA_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: model,
+        model: MODEL,
         prompt: `You are a professional Hollywood cinematographer. 
         Analyze this scene description: "${description}".
         Suggest exactly one technical improvement for color grading and one for lighting. 
@@ -84,13 +66,12 @@ export const analyzeScene = async (description: string): Promise<string> => {
 };
 
 export const suggestTags = async (description: string) => {
-  const model = getSelectedModel();
   try {
-    const response = await fetch(`${OLLAMA_BASE_URL}/api/generate`, {
+    const response = await fetch(OLLAMA_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: model,
+        model: MODEL,
         prompt: `Analyze the following description and return a JSON object with technical tags: lighting, cameraAngle, cameraMovement, colorPalette. 
         Description: "${description}"`,
         format: 'json',

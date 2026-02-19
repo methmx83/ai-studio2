@@ -1,34 +1,16 @@
 
 import React, { useState } from 'react';
 import { useEditorStore } from '../store';
-import { Save, Folder, HardDrive, Cpu, User, Info, Database, Workflow, Monitor, Package, FileCode, CheckCircle2, Layout, Maximize2, Settings2, ShieldCheck, Lock, Unlock, Link, FolderOpen, ChevronRight, Activity, Zap, RefreshCw } from 'lucide-react';
-import { fetchInstalledModels } from '../ollamaService';
+import { Save, Folder, HardDrive, Cpu, User, Info, Database, Workflow, Monitor, Package, FileCode, CheckCircle2, Layout, Maximize2, Settings2, ShieldCheck, Lock, Unlock, Link, FolderOpen, ChevronRight, Activity, Zap } from 'lucide-react';
 
 const SettingsView: React.FC = () => {
-  const { projectSettings, updateProjectSettings, saveProject, workspaceHandle, setWorkspaceHandle, systemStatus, setSystemStatus } = useEditorStore();
+  const { projectSettings, updateProjectSettings, saveProject, workspaceHandle, setWorkspaceHandle, systemStatus } = useEditorStore();
   const [isAuthorizing, setIsAuthorizing] = useState(false);
-  const [isRefreshingModels, setIsRefreshingModels] = useState(false);
 
   const handleResChange = (val: string) => {
     updateProjectSettings({
         defaults: { ...projectSettings.defaults, resolution: val }
     });
-  };
-
-  const handleOllamaModelChange = (val: string) => {
-    updateProjectSettings({
-        defaults: { ...projectSettings.defaults, ollamaModel: val }
-    });
-  };
-
-  const refreshModels = async () => {
-    setIsRefreshingModels(true);
-    try {
-      const models = await fetchInstalledModels();
-      setSystemStatus({ ollamaModels: models });
-    } finally {
-      setIsRefreshingModels(false);
-    }
   };
 
   const authorizeWorkspace = async () => {
@@ -137,31 +119,8 @@ const SettingsView: React.FC = () => {
           <div className="space-y-8">
              {/* AI Lab Config */}
              <section className="bg-zinc-900/40 rounded-3xl border border-white/5 p-8 space-y-6 shadow-inner">
-                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">AI Logic & Specs</h3>
+                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Resolution & Specs</h3>
                 <div className="space-y-6">
-                   <div className="space-y-2">
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[8px] text-zinc-600 uppercase font-black">Ollama Model</label>
-                        <button 
-                          onClick={refreshModels} 
-                          className={`text-blue-500 hover:text-blue-400 p-1 transition-all ${isRefreshingModels ? 'animate-spin' : ''}`}
-                        >
-                          <RefreshCw size={10} />
-                        </button>
-                      </div>
-                      <select 
-                        value={projectSettings.defaults.ollamaModel}
-                        onChange={(e) => handleOllamaModelChange(e.target.value)}
-                        className="w-full bg-zinc-950 border border-white/5 rounded-xl px-4 py-3 text-[11px] font-black text-zinc-300 focus:outline-none focus:border-blue-600 transition-all"
-                      >
-                         {systemStatus.ollamaModels.length === 0 ? (
-                            <option value="llama3:8b">llama3:8b (Default)</option>
-                         ) : (
-                            systemStatus.ollamaModels.map(m => <option key={m} value={m}>{m}</option>)
-                         )}
-                      </select>
-                   </div>
-
                    <div className="space-y-2">
                       <label className="text-[8px] text-zinc-600 uppercase font-black">Diffusion Target</label>
                       <select 
