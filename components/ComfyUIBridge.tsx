@@ -11,7 +11,7 @@ const ComfyUIBridge: React.FC = () => {
   const { 
     maskData, customWorkflows, addCustomWorkflow, selectedWorkflowId, 
     setSelectedWorkflowId, updateWorkflowParams, removeWorkflow, setActiveView,
-    projectSettings
+    projectSettings, setSystemStatus
   } = useEditorStore();
   
   const [isEnhancing, setIsEnhancing] = useState(false);
@@ -45,11 +45,35 @@ const ComfyUIBridge: React.FC = () => {
   };
 
   const checkBackends = async () => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
     try {
-      const cResp = await fetch(`${COMFY_URL}/system_stats`, { cache: 'no-store' });
-      setComfyStatus(cResp.ok ? 'online' : 'offline');
+      // Robust check: Verify both system stats and queue readiness
+      const [statsResp, queueResp] = await Promise.all([
+        fetch(`${COMFY_URL}/system_stats`, { signal: controller.signal, cache: 'no-store' }),
+        fetch(`${COMFY_URL}/queue`, { signal: controller.signal, cache: 'no-store' })
+      ]);
+      
+      clearTimeout(timeoutId);
+
+      if (statsResp.ok && queueResp.ok) {
+        const stats = await statsResp.json();
+        const queue = await queueResp.json();
+        
+        // Basic verification of ComfyUI response structure to ensure it's not just a hanging port
+        const isHealthy = !!(stats.system_stats && queue.queue_running !== undefined);
+        const status = isHealthy ? 'online' : 'offline';
+        
+        setComfyStatus(status);
+        // Synchronize with the global store so top-bar indicators reflect this status
+        setSystemStatus({ comfy: status });
+      } else {
+        throw new Error("Invalid response from backend");
+      }
     } catch (e) {
       setComfyStatus('offline');
+      setSystemStatus({ comfy: 'offline' });
     }
   };
 

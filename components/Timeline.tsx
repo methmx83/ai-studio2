@@ -3,7 +3,6 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Stage, Layer, Rect, Text, Group, Line, RegularPolygon } from 'react-konva';
 import { useEditorStore } from '../store';
 import { Play, Pause, Scissors, Magnet, ZoomIn, ZoomOut, Clock } from 'lucide-react';
-// Added Keyframe to imports to fix the type inference error below
 import { MediaType, Keyframe } from '../types';
 
 const TRACK_HEIGHT = 80;
@@ -14,16 +13,17 @@ const Timeline: React.FC = () => {
   const { 
     tracks, currentTime, duration, zoomLevel, setZoomLevel, 
     setCurrentTime, isPlaying, setIsPlaying, selectedClipId, setSelectedClipId,
-    updateClip, setSelectedKeyframes
+    updateClip, setSelectedKeyframes, addClipToTrack
   } = useEditorStore();
   
   const stageRef = useRef<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const pxPerSec = (zoomLevel / 100) * 100;
 
   useEffect(() => {
     const updateSize = () => {
-      const el = document.getElementById('timeline-container');
+      const el = containerRef.current;
       if (el) setContainerSize({ width: el.offsetWidth, height: el.offsetHeight });
     };
     updateSize();
@@ -52,10 +52,51 @@ const Timeline: React.FC = () => {
     setSelectedClipId(clipId);
   };
 
+  // Drag and Drop Logic
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const assetData = e.dataTransfer.getData('asset');
+    if (!assetData || !containerRef.current || !stageRef.current) return;
+
+    const asset = JSON.parse(assetData);
+    const rect = containerRef.current.getBoundingClientRect();
+    const stage = stageRef.current;
+    
+    // Calculate relative X/Y within the timeline area
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    // Adjust for horizontal scroll (stage.x) and label width
+    const scrollX = stage.x();
+    const timelineX = mouseX - TRACK_LABEL_WIDTH - scrollX;
+    const dropTime = Math.max(0, timelineX / pxPerSec);
+
+    // Identify target track based on Y position
+    const timelineY = mouseY - HEADER_HEIGHT;
+    const trackIndex = Math.floor(timelineY / TRACK_HEIGHT);
+
+    if (trackIndex >= 0 && trackIndex < tracks.length) {
+      const targetTrack = tracks[trackIndex];
+      addClipToTrack(targetTrack.id, asset, dropTime);
+      setSelectedClipId(asset.id);
+    }
+  };
+
   return (
-    <div id="timeline-container" className="flex flex-col h-[400px] bg-[#0d0d0f] border-t border-[#1a1a1e]">
+    <div 
+      ref={containerRef}
+      id="timeline-container" 
+      className="flex flex-col h-[400px] bg-[#0d0d0f] border-t border-[#1a1a1e] relative"
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
       {/* Toolbar */}
-      <div className="h-12 flex items-center justify-between px-6 border-b border-[#1a1a1e] bg-[#09090b]/50">
+      <div className="h-12 flex items-center justify-between px-6 border-b border-[#1a1a1e] bg-[#09090b]/50 shrink-0">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => setIsPlaying(!isPlaying)}
@@ -81,8 +122,8 @@ const Timeline: React.FC = () => {
             <button onClick={() => setZoomLevel(zoomLevel + 10)} className="text-zinc-500 hover:text-white"><ZoomIn size={14} /></button>
           </div>
           <div className="w-px h-4 bg-zinc-800" />
-          <button className="text-zinc-500 hover:text-white"><Scissors size={14} /></button>
-          <button className="text-zinc-500 hover:text-white"><Magnet size={14} /></button>
+          <button className="text-zinc-500 hover:text-white" title="Split Clip (Shortcut: S)"><Scissors size={14} /></button>
+          <button className="text-zinc-500 hover:text-white" title="Toggle Snapping"><Magnet size={14} /></button>
         </div>
       </div>
 
@@ -122,6 +163,8 @@ const Timeline: React.FC = () => {
                     draggable
                     onDragEnd={(e) => handleClipDragEnd(e, track.id, clip.id)}
                     onClick={(e) => { e.cancelBubble = true; setSelectedClipId(clip.id); }}
+                    onMouseEnter={() => { document.body.style.cursor = 'grab' }}
+                    onMouseLeave={() => { document.body.style.cursor = 'default' }}
                   >
                     <Rect
                       width={clip.duration * pxPerSec}
@@ -142,12 +185,12 @@ const Timeline: React.FC = () => {
                       fontSize={10}
                       fontStyle="bold"
                       fontFamily="Inter"
+                      listening={false}
                     />
 
                     {/* Keyframes Visual Representation */}
                     {Object.entries(clip.keyframes).map(([prop, kfs]) => (
                       <Group key={prop}>
-                        {/* Fix: Explicitly cast kfs to Keyframe[] to resolve 'Property map does not exist on type unknown' error */}
                         {(kfs as Keyframe[]).map((kf, kfIdx) => (
                           <RegularPolygon
                             key={`${prop}-${kfIdx}`}
@@ -198,7 +241,7 @@ const Timeline: React.FC = () => {
             </Group>
 
             {/* Playhead */}
-            <Group x={TRACK_LABEL_WIDTH + currentTime * pxPerSec} y={0}>
+            <Group x={TRACK_LABEL_WIDTH + currentTime * pxPerSec} y={0} listening={false}>
               <Line
                 points={[0, 0, 0, containerSize.height]}
                 stroke="#ef4444"
