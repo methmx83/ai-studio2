@@ -1,0 +1,8 @@
+{
+  "name": "Copy of AI Studio",
+  "description": "A professional hybrid video editor integrating classic editing tools with generative AI workflows, featuring a multi-track timeline, inspector, and ComfyUI bridge.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
