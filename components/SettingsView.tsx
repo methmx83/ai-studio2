@@ -4,7 +4,7 @@ import { useEditorStore } from '../store';
 import { Save, Folder, HardDrive, Cpu, User, Info, Database, Workflow, Monitor, Package, FileCode, CheckCircle2, Layout, Maximize2, Settings2, ShieldCheck, Lock, Unlock, Link, FolderOpen, ChevronRight, Activity, Zap } from 'lucide-react';
 
 const SettingsView: React.FC = () => {
-  const { projectSettings, updateProjectSettings, saveProject, workspaceHandle, setWorkspaceHandle, systemStatus } = useEditorStore();
+  const { projectSettings, updateProjectSettings, saveProject, workspaceHandle, setWorkspaceHandle, systemStatus, proxyMode, setProxyMode } = useEditorStore();
   const [isAuthorizing, setIsAuthorizing] = useState(false);
 
   const handleResChange = (val: string) => {
@@ -150,6 +150,22 @@ const SettingsView: React.FC = () => {
                     className="w-full py-4 bg-zinc-900 border border-zinc-800 rounded-xl text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:border-zinc-600 transition-all"
                    >
                      Force Export Project Folder
+                   </button>
+                </div>
+             </section>
+
+             <section className="bg-zinc-900/40 rounded-3xl border border-white/5 p-8 space-y-6">
+                <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500">Rendering Engine</h3>
+                <div className="flex items-center justify-between p-4 bg-zinc-950 rounded-2xl border border-white/5">
+                   <div className="space-y-1">
+                      <div className="text-[10px] font-black text-white uppercase tracking-widest">Proxy Mode</div>
+                      <div className="text-[8px] text-zinc-600 font-bold uppercase">Lower resolution for faster playback</div>
+                   </div>
+                   <button 
+                    onClick={() => setProxyMode(!proxyMode)}
+                    className={`w-12 h-6 rounded-full transition-all relative ${proxyMode ? 'bg-amber-500' : 'bg-zinc-800'}`}
+                   >
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${proxyMode ? 'left-7' : 'left-1'}`} />
                    </button>
                 </div>
              </section>

@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { useEditorStore } from '../store';
 import { AssetTag, MediaType } from '../types';
-import { Search, Film, Type as TypeIcon, Plus, Edit2, Check, X } from 'lucide-react';
+import { Search, Film, Type as TypeIcon, Plus, Edit2, Music, Check, X } from 'lucide-react';
+import { getAssetMetadata } from '../utils/assetUtils';
 
 const AssetLibrary: React.FC = () => {
   const { assets, addAsset, updateAsset } = useEditorStore();
@@ -13,18 +14,25 @@ const AssetLibrary: React.FC = () => {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files) {
-      Array.from(files).forEach((file: File) => {
+      Array.from(files).forEach(async (file: File) => {
         const id = crypto.randomUUID();
+        let type = MediaType.IMAGE;
+        if (file.type.includes('video')) type = MediaType.VIDEO;
+        else if (file.type.includes('audio')) type = MediaType.AUDIO;
+
+        const { thumbnailUrl, duration, metadata } = await getAssetMetadata(file, type);
+
         const newAsset = {
           id: id,
           name: file.name,
-          type: file.type.includes('video') ? MediaType.VIDEO : MediaType.IMAGE,
+          type: type,
           startTime: 0,
-          duration: 5,
+          duration: duration || 5,
           offset: 0,
           sourceUrl: URL.createObjectURL(file),
-          thumbnailUrl: 'https://picsum.photos/300/200?random=' + Math.random(),
+          thumbnailUrl: thumbnailUrl,
           tag: AssetTag.LOCAL,
+          metadata: metadata,
           properties: { scale: 100, posX: 0, posY: 0, opacity: 100, blur: 0 },
           keyframes: {}
         };
@@ -89,7 +97,7 @@ const AssetLibrary: React.FC = () => {
             </button>
             <label className="cursor-pointer p-1.5 rounded-md hover:bg-zinc-800 transition-colors text-zinc-400 hover:text-white border border-zinc-800">
               <Plus size={14} />
-              <input type="file" className="hidden" multiple onChange={handleFileUpload} accept="video/*,image/*" />
+              <input type="file" className="hidden" multiple onChange={handleFileUpload} accept="video/*,image/*,audio/*" />
             </label>
           </div>
         </div>
@@ -139,11 +147,36 @@ const AssetLibrary: React.FC = () => {
             ) : (
               <img src={asset.thumbnailUrl} alt={asset.name} className="w-full h-full object-cover opacity-40 group-hover:opacity-100 transition-opacity" />
             )}
+
+            {/* Metadata Overlay */}
+            <div className="absolute top-2 right-2 flex flex-col items-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+              {asset.metadata?.width && asset.metadata?.height && (
+                <div className="bg-black/80 backdrop-blur-sm px-1.5 py-0.5 rounded-md text-[7px] font-black text-zinc-300 border border-white/5 uppercase tracking-tighter">
+                  {asset.metadata.width}×{asset.metadata.height}
+                </div>
+              )}
+              {asset.duration > 0 && (
+                <div className="bg-blue-600/80 backdrop-blur-sm px-1.5 py-0.5 rounded-md text-[7px] font-black text-white border border-blue-400/20 uppercase tracking-tighter">
+                  {asset.duration.toFixed(2)}s
+                </div>
+              )}
+              {asset.metadata?.fileSize && (
+                <div className="bg-zinc-800/80 backdrop-blur-sm px-1.5 py-0.5 rounded-md text-[7px] font-black text-zinc-400 border border-white/5 uppercase tracking-tighter">
+                  {(asset.metadata.fileSize / (1024 * 1024)).toFixed(2)} MB
+                </div>
+              )}
+            </div>
             
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-2 opacity-90 group-hover:opacity-100">
               <div className="flex items-center justify-between gap-1 text-[9px] text-zinc-300 font-bold uppercase tracking-widest">
                 <div className="flex items-center gap-1.5 truncate flex-1">
-                  {asset.type === MediaType.TEXT ? <TypeIcon size={10} className="text-blue-400" /> : <Film size={10} />}
+                  {asset.type === MediaType.TEXT ? (
+                    <TypeIcon size={10} className="text-blue-400" />
+                  ) : asset.type === MediaType.AUDIO ? (
+                    <Music size={10} className="text-purple-400" />
+                  ) : (
+                    <Film size={10} />
+                  )}
                   
                   {editingId === asset.id ? (
                     <div className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>

@@ -160,13 +160,17 @@ const Timeline: React.FC = () => {
                             strokeWidth={0.5}
                             onClick={(e) => handleKeyframeClick(e, track.id, clip.id, prop, kfIdx)}
                             onMouseEnter={(e) => {
-                              const container = e.target.getStage().container();
-                              container.style.cursor = 'pointer';
+                              const stage = e.target.getStage();
+                              if (stage) {
+                                stage.container().style.cursor = 'pointer';
+                              }
                               e.target.scale({ x: 1.5, y: 1.5 });
                             }}
                             onMouseLeave={(e) => {
-                              const container = e.target.getStage().container();
-                              container.style.cursor = 'default';
+                              const stage = e.target.getStage();
+                              if (stage) {
+                                stage.container().style.cursor = 'default';
+                              }
                               e.target.scale({ x: 1, y: 1 });
                             }}
                           />

@@ -1,6 +1,6 @@
 
 import { create } from 'zustand';
-import { TimelineTrack, TimelineClip, AssetTag, MediaType, Keyframe, SelectedKeyframe, ProjectSettings } from './types';
+import { TimelineTrack, TimelineClip, AssetTag, MediaType, Keyframe, SelectedKeyframe, ProjectSettings, VoiceProfile, VoicePreset } from './types';
 
 // Export CustomWorkflow for use in other components like ComfyUIBridge
 export interface CustomWorkflow {
@@ -18,7 +18,7 @@ interface SystemStatus {
   nodes: { name: string; installed: boolean }[];
 }
 
-type ViewType = 'studio' | 'lab' | 'settings';
+type ViewType = 'studio' | 'lab' | 'settings' | 'voice';
 
 interface EditorState {
   activeView: ViewType;
@@ -37,10 +37,19 @@ interface EditorState {
   maskData: string | null;
   proxyMode: boolean;
   customWorkflows: CustomWorkflow[];
+  voiceProfiles: VoiceProfile[];
+  voicePresets: VoicePreset[];
   selectedWorkflowId: string | null;
   workspaceHandle: any | null;
   
+  // History
+  past: any[];
+  future: any[];
+  
   // Actions
+  undo: () => void;
+  redo: () => void;
+  saveHistory: () => void;
   setActiveView: (view: ViewType) => void;
   setCurrentTime: (time: number) => void;
   setZoomLevel: (zoom: number) => void;
@@ -67,6 +76,13 @@ interface EditorState {
   updateProjectSettings: (settings: Partial<ProjectSettings>) => void;
   setWorkspaceHandle: (handle: any) => void;
   applyOpacityPreset: (trackId: string, clipId: string, preset: 'fadeIn' | 'fadeOut' | 'crossFade') => void;
+  
+  // Voice Actions
+  addVoiceProfile: (profile: VoiceProfile) => void;
+  updateVoiceProfile: (id: string, updates: Partial<VoiceProfile>) => void;
+  removeVoiceProfile: (id: string) => void;
+  addVoicePreset: (preset: VoicePreset) => void;
+  removeVoicePreset: (id: string) => void;
 }
 
 const INITIAL_TRACKS: TimelineTrack[] = [
@@ -118,8 +134,78 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   maskData: null,
   proxyMode: false,
   customWorkflows: [],
+  voiceProfiles: [],
+  voicePresets: [],
   selectedWorkflowId: null,
   workspaceHandle: null,
+  past: [],
+  future: [],
+
+  saveHistory: () => {
+    const state = get();
+    const snapshot = {
+      tracks: JSON.parse(JSON.stringify(state.tracks)),
+      assets: JSON.parse(JSON.stringify(state.assets)),
+      projectSettings: JSON.parse(JSON.stringify(state.projectSettings)),
+      customWorkflows: JSON.parse(JSON.stringify(state.customWorkflows)),
+      voiceProfiles: JSON.parse(JSON.stringify(state.voiceProfiles)),
+      voicePresets: JSON.parse(JSON.stringify(state.voicePresets)),
+      maskData: state.maskData,
+    };
+    
+    set(state => ({
+      past: [...state.past.slice(-49), snapshot], // Keep last 50 steps
+      future: []
+    }));
+  },
+
+  undo: () => {
+    const { past, future } = get();
+    if (past.length === 0) return;
+
+    const currentState = {
+      tracks: JSON.parse(JSON.stringify(get().tracks)),
+      assets: JSON.parse(JSON.stringify(get().assets)),
+      projectSettings: JSON.parse(JSON.stringify(get().projectSettings)),
+      customWorkflows: JSON.parse(JSON.stringify(get().customWorkflows)),
+      voiceProfiles: JSON.parse(JSON.stringify(get().voiceProfiles)),
+      voicePresets: JSON.parse(JSON.stringify(get().voicePresets)),
+      maskData: get().maskData,
+    };
+
+    const previous = past[past.length - 1];
+    const newPast = past.slice(0, past.length - 1);
+
+    set({
+      ...previous,
+      past: newPast,
+      future: [currentState, ...future]
+    });
+  },
+
+  redo: () => {
+    const { past, future } = get();
+    if (future.length === 0) return;
+
+    const currentState = {
+      tracks: JSON.parse(JSON.stringify(get().tracks)),
+      assets: JSON.parse(JSON.stringify(get().assets)),
+      projectSettings: JSON.parse(JSON.stringify(get().projectSettings)),
+      customWorkflows: JSON.parse(JSON.stringify(get().customWorkflows)),
+      voiceProfiles: JSON.parse(JSON.stringify(get().voiceProfiles)),
+      voicePresets: JSON.parse(JSON.stringify(get().voicePresets)),
+      maskData: get().maskData,
+    };
+
+    const next = future[0];
+    const newFuture = future.slice(1);
+
+    set({
+      ...next,
+      past: [...past, currentState],
+      future: newFuture
+    });
+  },
 
   setActiveView: (view) => set({ activeView: view }),
   setCurrentTime: (time) => set({ currentTime: Math.max(0, time) }),
@@ -129,24 +215,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   setSystemStatus: (status) => set(state => ({ systemStatus: { ...state.systemStatus, ...status } })),
   
-  addAsset: (asset) => set(state => ({ assets: [...state.assets, asset] })),
-  updateAsset: (id, updates) => set(state => ({ 
-    assets: state.assets.map(a => a.id === id ? { ...a, ...updates } : a) 
-  })),
+  addAsset: (asset) => {
+    get().saveHistory();
+    set(state => ({ assets: [...state.assets, asset] }));
+  },
+  updateAsset: (id, updates) => {
+    get().saveHistory();
+    set(state => ({ 
+      assets: state.assets.map(a => a.id === id ? { ...a, ...updates } : a) 
+    }));
+  },
 
-  addClipToTrack: (trackId, asset, startTime) => set(state => ({
-    tracks: state.tracks.map(t => t.id === trackId ? {
-      ...t,
-      clips: [...t.clips, { ...asset, id: crypto.randomUUID(), startTime }]
-    } : t)
-  })),
+  addClipToTrack: (trackId, asset, startTime) => {
+    get().saveHistory();
+    set(state => ({
+      tracks: state.tracks.map(t => t.id === trackId ? {
+        ...t,
+        clips: [...t.clips, { ...asset, id: crypto.randomUUID(), startTime }]
+      } : t)
+    }));
+  },
 
-  updateClip: (trackId, clipId, updates) => set(state => ({
-    tracks: state.tracks.map(t => t.id === trackId ? {
-      ...t,
-      clips: t.clips.map(c => c.id === clipId ? { ...c, ...updates, properties: { ...c.properties, ...(updates.properties || {}) } } : c)
-    } : t)
-  })),
+  updateClip: (trackId, clipId, updates) => {
+    get().saveHistory();
+    set(state => ({
+      tracks: state.tracks.map(t => t.id === trackId ? {
+        ...t,
+        clips: t.clips.map(c => c.id === clipId ? { ...c, ...updates, properties: { ...c.properties, ...(updates.properties || {}) } } : c)
+      } : t)
+    }));
+  },
 
   // Added missing saveProject action
   saveProject: async (isAutoSave = false) => {
@@ -155,132 +253,186 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     return new Promise(resolve => setTimeout(resolve, 500));
   },
 
-  updateKeyframe: (trackId, clipId, property, index, updates) => set(state => ({
-    tracks: state.tracks.map(t => t.id === trackId ? {
-      ...t,
-      clips: t.clips.map(c => c.id === clipId ? {
-        ...c,
-        keyframes: {
-          ...c.keyframes,
-          [property]: (c.keyframes[property] || []).map((k, i) => i === index ? { ...k, ...updates } : k)
-        }
-      } : c)
-    } : t)
-  })),
-
-  setKeyframeAtTime: (trackId, clipId, property, value) => set(state => {
-    const track = state.tracks.find(t => t.id === trackId);
-    if (!track) return state;
-    const clip = track.clips.find(c => c.id === clipId);
-    if (!clip) return state;
-
-    const timeInClip = state.currentTime - clip.startTime;
-    const existingKfs = clip.keyframes[property] || [];
-    const index = existingKfs.findIndex(k => Math.abs(k.time - timeInClip) < 0.05);
-
-    let newKfs;
-    if (index !== -1) {
-      newKfs = existingKfs.map((k, i) => i === index ? { ...k, value } : k);
-    } else {
-      newKfs = [...existingKfs, { time: timeInClip, value, easing: 'linear' }].sort((a, b) => a.time - b.time);
-    }
-
-    return {
+  updateKeyframe: (trackId, clipId, property, index, updates) => {
+    get().saveHistory();
+    set(state => ({
       tracks: state.tracks.map(t => t.id === trackId ? {
         ...t,
         clips: t.clips.map(c => c.id === clipId ? {
           ...c,
-          keyframes: { ...c.keyframes, [property]: newKfs }
+          keyframes: {
+            ...c.keyframes,
+            [property]: (c.keyframes[property] || []).map((k, i) => i === index ? { ...k, ...updates } : k)
+          }
         } : c)
       } : t)
-    };
-  }),
+    }));
+  },
 
-  toggleKeyframe: (trackId, clipId, property) => set(state => {
-    const track = state.tracks.find(t => t.id === trackId);
-    if (!track) return state;
-    const clip = track.clips.find(c => c.id === clipId);
-    if (!clip) return state;
+  setKeyframeAtTime: (trackId, clipId, property, value) => {
+    get().saveHistory();
+    set(state => {
+      const track = state.tracks.find(t => t.id === trackId);
+      if (!track) return state;
+      const clip = track.clips.find(c => c.id === clipId);
+      if (!clip) return state;
 
-    const timeInClip = state.currentTime - clip.startTime;
-    const existingKfs = clip.keyframes[property] || [];
-    const index = existingKfs.findIndex(k => Math.abs(k.time - timeInClip) < 0.1);
+      const timeInClip = state.currentTime - clip.startTime;
+      const existingKfs = clip.keyframes[property] || [];
+      const index = existingKfs.findIndex(k => Math.abs(k.time - timeInClip) < 0.05);
 
-    let newKfs;
-    if (index !== -1) {
-      newKfs = existingKfs.filter((_, i) => i !== index);
-    } else {
-      const val = (clip.properties as any)[property];
-      newKfs = [...existingKfs, { time: timeInClip, value: val, easing: 'linear' }].sort((a, b) => a.time - b.time);
-    }
+      let newKfs;
+      if (index !== -1) {
+        newKfs = existingKfs.map((k, i) => i === index ? { ...k, value } : k);
+      } else {
+        newKfs = [...existingKfs, { time: timeInClip, value, easing: 'linear' as const }].sort((a, b) => a.time - b.time);
+      }
 
-    return {
-      tracks: state.tracks.map(t => t.id === trackId ? {
-        ...t,
-        clips: t.clips.map(c => c.id === clipId ? {
-          ...c,
-          keyframes: { ...c.keyframes, [property]: newKfs }
-        } : c)
-      } : t)
-    };
-  }),
+      return {
+        tracks: state.tracks.map(t => t.id === trackId ? {
+          ...t,
+          clips: t.clips.map(c => c.id === clipId ? {
+            ...c,
+            keyframes: { ...c.keyframes, [property]: newKfs }
+          } : c)
+        } : t)
+      };
+    });
+  },
+
+  toggleKeyframe: (trackId, clipId, property) => {
+    get().saveHistory();
+    set(state => {
+      const track = state.tracks.find(t => t.id === trackId);
+      if (!track) return state;
+      const clip = track.clips.find(c => c.id === clipId);
+      if (!clip) return state;
+
+      const timeInClip = state.currentTime - clip.startTime;
+      const existingKfs = clip.keyframes[property] || [];
+      const index = existingKfs.findIndex(k => Math.abs(k.time - timeInClip) < 0.1);
+
+      let newKfs;
+      if (index !== -1) {
+        newKfs = existingKfs.filter((_, i) => i !== index);
+      } else {
+        const val = (clip.properties as any)[property];
+        newKfs = [...existingKfs, { time: timeInClip, value: val, easing: 'linear' as const }].sort((a, b) => a.time - b.time);
+      }
+
+      return {
+        tracks: state.tracks.map(t => t.id === trackId ? {
+          ...t,
+          clips: t.clips.map(c => c.id === clipId ? {
+            ...c,
+            keyframes: { ...c.keyframes, [property]: newKfs }
+          } : c)
+        } : t)
+      };
+    });
+  },
 
   // Added missing state update actions for AI features and project settings
-  setMaskData: (mask) => set({ maskData: mask }),
+  setMaskData: (mask) => {
+    get().saveHistory();
+    set({ maskData: mask });
+  },
   setProxyMode: (active) => set({ proxyMode: active }),
-  addCustomWorkflow: (wf) => set(state => ({ customWorkflows: [...state.customWorkflows, wf] })),
+  addCustomWorkflow: (wf) => {
+    get().saveHistory();
+    set(state => ({ customWorkflows: [...state.customWorkflows, wf] }));
+  },
   setSelectedWorkflowId: (id) => set({ selectedWorkflowId: id }),
-  updateWorkflowParams: (id, params) => set(state => ({
-    customWorkflows: state.customWorkflows.map(wf => 
-      wf.id === id ? { ...wf, parameters: { ...wf.parameters, ...params } } : wf
-    )
-  })),
-  removeWorkflow: (id) => set(state => ({ 
-    customWorkflows: state.customWorkflows.filter(wf => wf.id !== id),
-    selectedWorkflowId: state.selectedWorkflowId === id ? null : state.selectedWorkflowId
-  })),
-  updateProjectSettings: (settings) => set(state => ({ 
-    projectSettings: { ...state.projectSettings, ...settings } 
-  })),
+  updateWorkflowParams: (id, params) => {
+    get().saveHistory();
+    set(state => ({
+      customWorkflows: state.customWorkflows.map(wf => 
+        wf.id === id ? { ...wf, parameters: { ...wf.parameters, ...params } } : wf
+      )
+    }));
+  },
+  removeWorkflow: (id) => {
+    get().saveHistory();
+    set(state => ({ 
+      customWorkflows: state.customWorkflows.filter(wf => wf.id !== id),
+      selectedWorkflowId: state.selectedWorkflowId === id ? null : state.selectedWorkflowId
+    }));
+  },
+  updateProjectSettings: (settings) => {
+    get().saveHistory();
+    set(state => ({ 
+      projectSettings: { ...state.projectSettings, ...settings } 
+    }));
+  },
   setWorkspaceHandle: (handle) => set({ workspaceHandle: handle }),
 
   // Completed the truncated applyOpacityPreset action
-  applyOpacityPreset: (trackId, clipId, preset) => set(state => {
-    const track = state.tracks.find(t => t.id === trackId);
-    if (!track) return state;
-    const clip = track.clips.find(c => c.id === clipId);
-    if (!clip) return state;
+  applyOpacityPreset: (trackId, clipId, preset) => {
+    get().saveHistory();
+    set(state => {
+      const track = state.tracks.find(t => t.id === trackId);
+      if (!track) return state;
+      const clip = track.clips.find(c => c.id === clipId);
+      if (!clip) return state;
 
-    let newKfs = clip.keyframes.opacity || [];
-    const duration = clip.duration;
-    
-    if (preset === 'fadeIn') {
-      newKfs = [
-        { time: 0, value: 0, easing: 'ease-out' },
-        { time: 0.5, value: 100, easing: 'linear' }
-      ];
-    } else if (preset === 'fadeOut') {
-      newKfs = [
-        { time: duration - 0.5, value: 100, easing: 'linear' },
-        { time: duration, value: 0, easing: 'ease-in' }
-      ];
-    } else if (preset === 'crossFade') {
-      newKfs = [
-        { time: 0, value: 0, easing: 'linear' },
-        { time: 0.5, value: 100, easing: 'linear' },
-        { time: duration - 0.5, value: 100, easing: 'linear' },
-        { time: duration, value: 0, easing: 'linear' }
-      ];
-    }
+      let newKfs = clip.keyframes.opacity || [];
+      const duration = clip.duration;
+      
+      if (preset === 'fadeIn') {
+        newKfs = [
+          { time: 0, value: 0, easing: 'ease-out' as const },
+          { time: 0.5, value: 100, easing: 'linear' as const }
+        ];
+      } else if (preset === 'fadeOut') {
+        newKfs = [
+          { time: duration - 0.5, value: 100, easing: 'linear' as const },
+          { time: duration, value: 0, easing: 'ease-in' as const }
+        ];
+      } else if (preset === 'crossFade') {
+        newKfs = [
+          { time: 0, value: 0, easing: 'linear' as const },
+          { time: 0.5, value: 100, easing: 'linear' as const },
+          { time: duration - 0.5, value: 100, easing: 'linear' as const },
+          { time: duration, value: 0, easing: 'linear' as const }
+        ];
+      }
 
-    return {
-      tracks: state.tracks.map(t => t.id === trackId ? {
-        ...t,
-        clips: t.clips.map(c => c.id === clipId ? {
-          ...c,
-          keyframes: { ...c.keyframes, opacity: newKfs }
-        } : c)
-      } : t)
-    };
-  }),
+      return {
+        tracks: state.tracks.map(t => t.id === trackId ? {
+          ...t,
+          clips: t.clips.map(c => c.id === clipId ? {
+            ...c,
+            keyframes: { ...c.keyframes, opacity: newKfs }
+          } : c)
+        } : t)
+      };
+    });
+  },
+
+  addVoiceProfile: (profile) => {
+    get().saveHistory();
+    set(state => ({ voiceProfiles: [...state.voiceProfiles, profile] }));
+  },
+
+  updateVoiceProfile: (id, updates) => {
+    get().saveHistory();
+    set(state => ({
+      voiceProfiles: state.voiceProfiles.map(p => p.id === id ? { ...p, ...updates } : p)
+    }));
+  },
+
+  removeVoiceProfile: (id) => {
+    get().saveHistory();
+    set(state => ({ voiceProfiles: state.voiceProfiles.filter(p => p.id !== id) }));
+  },
+
+  addVoicePreset: (preset) => {
+    get().saveHistory();
+    set(state => ({ voicePresets: [...state.voicePresets, preset] }));
+  },
+
+  removeVoicePreset: (id) => {
+    get().saveHistory();
+    set(state => ({ voicePresets: state.voicePresets.filter(p => p.id !== id) }));
+  },
 }));

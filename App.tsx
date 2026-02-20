@@ -8,10 +8,28 @@ import Preview from './components/Preview';
 import ComfyUIBridge from './components/ComfyUIBridge';
 import ComfyUIView from './components/ComfyUIView';
 import SettingsView from './components/SettingsView';
-import { Layout, FlaskConical, Settings, Save, Terminal, Cpu, Database, ChevronRight, Activity, Zap } from 'lucide-react';
+import VoiceLab from './components/VoiceLab';
+import { Layout, FlaskConical, Settings, Save, Terminal, Cpu, Database, ChevronRight, Activity, Zap, Undo2, Redo2, Mic } from 'lucide-react';
 
 const App: React.FC = () => {
-  const { isPlaying, setCurrentTime, activeView, setActiveView, projectSettings, systemStatus } = useEditorStore();
+  const { isPlaying, setCurrentTime, activeView, setActiveView, projectSettings, systemStatus, undo, redo, past, future } = useEditorStore();
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+        redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   useEffect(() => {
     let frameId: number;
@@ -42,12 +60,32 @@ const App: React.FC = () => {
 
           <div className="flex items-center bg-[#050506] rounded-xl p-1 border border-[#1a1a1e]">
             <NavBtn active={activeView === 'studio'} onClick={() => setActiveView('studio')} icon={<Layout size={14} />} label="Studio" />
+            <NavBtn active={activeView === 'voice'} onClick={() => setActiveView('voice')} icon={<Mic size={14} />} label="Voice Lab" />
             <NavBtn active={activeView === 'lab'} onClick={() => setActiveView('lab')} icon={<FlaskConical size={14} />} label="AI Lab" />
             <NavBtn active={activeView === 'settings'} onClick={() => setActiveView('settings')} icon={<Settings size={14} />} label="Configs" />
           </div>
         </div>
 
         <div className="flex items-center gap-6">
+          <div className="flex items-center gap-1 bg-[#1a1a1e] rounded-lg p-1 border border-white/5">
+            <button 
+              onClick={undo} 
+              disabled={past.length === 0}
+              className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 size={14} />
+            </button>
+            <button 
+              onClick={redo} 
+              disabled={future.length === 0}
+              className="p-1.5 hover:bg-zinc-800 rounded text-zinc-400 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent transition-all"
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo2 size={14} />
+            </button>
+          </div>
+
           <div className="flex items-center gap-4 bg-[#1a1a1e]/50 px-3 py-1.5 rounded-xl border border-white/5">
              <div className="flex items-center gap-2">
                <div className={`w-1.5 h-1.5 rounded-full ${systemStatus.comfy === 'online' ? 'bg-green-500' : 'bg-red-500'} animate-pulse`} />
@@ -80,6 +118,8 @@ const App: React.FC = () => {
             </div>
             <Timeline />
           </div>
+        ) : activeView === 'voice' ? (
+          <VoiceLab />
         ) : activeView === 'lab' ? (
           <ComfyUIView />
         ) : (

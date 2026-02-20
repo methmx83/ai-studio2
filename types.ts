@@ -19,6 +19,25 @@ export interface Keyframe {
   bezierPoints?: [number, number, number, number]; // [x1, y1, x2, y2]
 }
 
+export interface VoiceProfile {
+  id: string;
+  name: string;
+  sampleUrl?: string;
+  baseVoice: 'Puck' | 'Charon' | 'Kore' | 'Fenrir' | 'Zephyr';
+  characteristics: string[];
+  pitch?: number;
+  speed?: number;
+  accent?: string;
+}
+
+export interface VoicePreset {
+  id: string;
+  name: string;
+  pitch: number;
+  speed: number;
+  accent: string;
+}
+
 export interface ProjectSettings {
   projectName: string;
   projectVersion: string;
@@ -40,6 +59,14 @@ export interface ProjectSettings {
   };
 }
 
+export interface AssetMetadata {
+  width?: number;
+  height?: number;
+  codec?: string;
+  fileSize?: number;
+  mimeType?: string;
+}
+
 export interface TimelineClip {
   id: string;
   name: string;
@@ -50,6 +77,7 @@ export interface TimelineClip {
   sourceUrl: string;
   thumbnailUrl: string;
   tag: AssetTag;
+  metadata?: AssetMetadata;
   properties: {
     scale: number;
     posX: number;

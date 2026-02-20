@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { useEditorStore } from '../store';
-import { Pencil, Square, Circle, Eraser, Download, Maximize, Trash2, Camera, Type, Move } from 'lucide-react';
+import { Pencil, Square, Circle, Eraser, Download, Maximize, Trash2, Camera, Type, Move, Zap } from 'lucide-react';
 import { MediaType, Keyframe } from '../types';
 
 /**
@@ -244,8 +244,9 @@ const Preview: React.FC = () => {
                PRO_MONITOR_4K
              </div>
              {proxyMode && (
-               <div className="bg-purple-600/80 px-4 py-2 rounded-2xl text-[10px] font-black font-mono text-white border border-purple-400/20 shadow-2xl">
-                 PROXY_ACTIVE (LOW_RES)
+               <div className="bg-amber-500/10 backdrop-blur-md px-3 py-1.5 rounded-full text-[9px] font-black font-mono text-amber-500 border border-amber-500/20 flex items-center gap-2 animate-pulse">
+                 <Zap size={10} fill="currentColor" />
+                 PROXY ACTIVE
                </div>
              )}
           </div>

@@ -114,6 +114,28 @@ const Inspector: React.FC = () => {
               <span>Type: {selectedClip.type}</span>
               <span>ID: {selectedClip.id.split('-')[0]}</span>
             </div>
+            {selectedClip.metadata && (
+              <div className="pt-2 border-t border-white/5 space-y-1">
+                {selectedClip.metadata.width && selectedClip.metadata.height && (
+                  <div className="flex justify-between text-[8px] font-mono text-zinc-500 uppercase">
+                    <span>Resolution:</span>
+                    <span className="text-zinc-400">{selectedClip.metadata.width}×{selectedClip.metadata.height}</span>
+                  </div>
+                )}
+                {selectedClip.duration > 0 && (
+                  <div className="flex justify-between text-[8px] font-mono text-zinc-500 uppercase">
+                    <span>Duration:</span>
+                    <span className="text-zinc-400">{selectedClip.duration.toFixed(2)}s</span>
+                  </div>
+                )}
+                {selectedClip.metadata.mimeType && (
+                  <div className="flex justify-between text-[8px] font-mono text-zinc-500 uppercase">
+                    <span>Format:</span>
+                    <span className="text-zinc-400 truncate ml-4" title={selectedClip.metadata.mimeType}>{selectedClip.metadata.mimeType}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </section>
 
@@ -214,9 +236,17 @@ const Inspector: React.FC = () => {
             </div>
             <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800 space-y-4 shadow-inner">
                <div className="space-y-2">
-                  <label className="text-[8px] text-zinc-600 uppercase font-black">Content</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[8px] text-zinc-600 uppercase font-black">Content</label>
+                    <span className={`text-[7px] font-mono uppercase font-black ${
+                      (selectedClip.properties.text?.length || 0) >= 100 ? 'text-red-500' : 'text-zinc-500'
+                    }`}>
+                      {100 - (selectedClip.properties.text?.length || 0)} Remaining
+                    </span>
+                  </div>
                   <input 
                     type="text" 
+                    maxLength={100}
                     value={selectedClip.properties.text} 
                     onChange={(e) => handleUpdate('text', e.target.value)}
                     className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs font-bold text-white focus:outline-none focus:border-blue-500 transition-all uppercase tracking-tighter"
